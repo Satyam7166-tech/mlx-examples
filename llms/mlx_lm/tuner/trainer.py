@@ -2,8 +2,10 @@
 
 import time
 from dataclasses import dataclass, field
+import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Union
+
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -160,14 +162,52 @@ def evaluate(
 
 
 class TrainingCallback:
+    def __init__(self, log_file: Union[str, Path]):
+        self.log_file = Path(log_file)
+        self.train_losses = []
+        self.val_losses = []
+        self.iterations = []
+        self.val_iterations = []
 
     def on_train_loss_report(self, train_info: dict):
-        """Called to report training loss at specified intervals."""
-        pass
+        log_entry = (
+            f"Iter {train_info['iteration']}: "
+            f"Train loss {train_info['train_loss']:.3f}, "
+            f"Learning Rate {train_info['learning_rate']:.3e}, "
+            f"It/sec {train_info['iterations_per_second']:.3f}, "
+            f"Tokens/sec {train_info['tokens_per_second']:.3f}, "
+            f"Trained Tokens {train_info['trained_tokens']}, "
+            f"Peak mem {train_info['peak_memory']:.3f} GB"
+        )
+        print(log_entry)
+        with open(self.log_file, 'a') as f:
+            f.write(log_entry + '\n')
+        self.train_losses.append(train_info['train_loss'])
+        self.iterations.append(train_info['iteration'])
 
     def on_val_loss_report(self, val_info: dict):
-        """Called to report validation loss at specified intervals or the beginning."""
-        pass
+        log_entry = (
+            f"Iter {val_info['iteration']}: "
+            f"Val loss {val_info['val_loss']:.3f}, "
+            f"Val took {val_info['val_time']:.3f}s"
+        )
+        print(log_entry)
+        with open(self.log_file, 'a') as f:
+            f.write(log_entry + '\n')
+        self.val_losses.append(val_info['val_loss'])
+        self.val_iterations.append(val_info['iteration'])
+
+    def create_and_save_graph(self, graph_file: Union[str, Path]):
+        plt.figure(figsize=(12, 6))
+        plt.plot(self.iterations, self.train_losses, label='Train Loss')
+        plt.plot(self.val_iterations, self.val_losses, label='Validation Loss')
+        plt.xlabel('Iteration')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(graph_file)
+        plt.close()
 
 
 def train(

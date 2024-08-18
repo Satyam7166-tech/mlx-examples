@@ -10,6 +10,7 @@ import mlx.nn as nn
 import mlx.optimizers as optim
 import numpy as np
 import yaml
+import matplotlib.pyplot as plt
 
 from .tokenizer_utils import TokenizerWrapper
 from .tuner.datasets import load_dataset
@@ -21,6 +22,7 @@ from .tuner.utils import (
     print_trainable_parameters,
 )
 from .utils import load, save_config
+
 
 yaml_loader = yaml.SafeLoader
 yaml_loader.add_implicit_resolver(
@@ -178,7 +180,12 @@ def train_model(
     adapter_path = Path(args.adapter_path)
     adapter_path.mkdir(parents=True, exist_ok=True)
     adapter_file = adapter_path / "adapters.safetensors"
+    log_file = adapter_path / "training_log.txt"
+    graph_file = adapter_path / "training_graph.png"
     save_config(vars(args), adapter_path / "adapter_config.json")
+
+    if training_callback is None:
+        training_callback = TrainingCallback(log_file)
 
     # init training args
     training_args = TrainingArgs(
@@ -199,6 +206,7 @@ def train_model(
             build_schedule(args.lr_schedule) if args.lr_schedule else args.learning_rate
         )
     )
+
     # Train model
     train(
         model=model,
@@ -209,6 +217,10 @@ def train_model(
         val_dataset=valid_set,
         training_callback=training_callback,
     )
+
+    # Create and save graph after training
+    training_callback.create_and_save_graph(graph_file)
+    print(f"Saved training graph to {graph_file}.")
 
 
 def evaluate_model(args, model: nn.Module, tokenizer: TokenizerWrapper, test_set):
